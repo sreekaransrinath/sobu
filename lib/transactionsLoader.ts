@@ -45,14 +45,23 @@ export async function loadTransactions(csvContent: string): Promise<Transaction[
     const records = parse(csvContent, {
       columns: true,
       skip_empty_lines: true,
+      trim: true // Trim whitespace from all fields
+    })
+
+    // Filter out completely empty rows (where all fields are empty or just whitespace)
+    const nonEmptyRecords = records.filter((record: any) => {
+      return Object.values(record).some(value => 
+        value !== undefined && value !== null && value.toString().trim() !== ""
+      )
     })
 
     const currentYear = new Date().getFullYear()
 
-    return records
+    return nonEmptyRecords
       .filter((record: any) => {
-        // Skip records with empty amount
-        return record.Amount && record.Amount.trim() !== ""
+        // Skip records with empty/zero amount or empty category
+        const amount = parseFloat(record.Amount?.replace(/[^0-9.]/g, "") || "0")
+        return amount > 0 && record.Category && record.Category.trim() !== ""
       })
       .map((record: any) => {
         // Check if this is a fixed expense (no date)
@@ -83,13 +92,13 @@ export async function loadTransactions(csvContent: string): Promise<Transaction[
           const cleanAmount = record.Amount.replace(/[^0-9.]/g, "")
           amount = Number.parseFloat(cleanAmount)
           if (isNaN(amount)) {
-            amount = 0
+            return null // Skip invalid amounts
           }
         }
 
         return {
           date,
-          category: record.Category || "Uncategorized",
+          category: record.Category,
           amount,
           description: record.Description || "No description",
           isFixedExpense: isFixedExpense,
