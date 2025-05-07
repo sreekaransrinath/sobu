@@ -17,8 +17,20 @@ export function ChartLineDaily({ timeSeriesData, timeGranularity }: ChartLineDai
     const fixedExpenses = timeSeriesData.fixed || 0
     delete timeSeriesData.fixed // Remove fixed from the data to process
 
-    // Create sorted array of dates
-    const sortedDates = Object.keys(timeSeriesData).sort()
+    // Get current date
+    const currentDate = new Date()
+    const currentYear = currentDate.getFullYear()
+    const currentMonth = currentDate.getMonth() + 1
+    const currentDay = currentDate.getDate()
+    const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`
+
+    // Create sorted array of dates up to current date
+    const sortedDates = Object.keys(timeSeriesData)
+      .filter(date => {
+        // Only include dates up to current date and with non-zero spending
+        return date <= currentDateStr && timeSeriesData[date] > 0
+      })
+      .sort()
 
     return sortedDates.map(date => {
       // Format the date label
@@ -42,8 +54,9 @@ export function ChartLineDaily({ timeSeriesData, timeGranularity }: ChartLineDai
         periodFixedExpenses = fixedExpenses / 4 // Distribute across weeks
       }
 
-      const dailySpending = timeSeriesData[date]
-      const fixedSpending = periodFixedExpenses
+      const dailySpending = timeSeriesData[date] || 0
+      // Only include fixed spending if there's actual daily spending
+      const fixedSpending = dailySpending > 0 ? periodFixedExpenses : 0
       const totalSpending = dailySpending + fixedSpending
 
       return {
@@ -86,21 +99,27 @@ export function ChartLineDaily({ timeSeriesData, timeGranularity }: ChartLineDai
       </h3>
       <div className="h-[calc(100%-32px)]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+          <LineChart 
+            data={chartData} 
+            margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12 }}
               height={30}
               tickMargin={10}
-              interval="preserveStartEnd"
+              interval={chartData.length > 14 ? Math.ceil(chartData.length / 7) : 0}
+              angle={-30}
+              textAnchor="end"
             />
             <YAxis
               tickFormatter={formatCurrency}
               width={80}
+              domain={['dataMin - 100', 'dataMax + 100']}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend verticalAlign="top" height={36} />
+            <Legend verticalAlign="top" height={36} iconType="circle" />
             <Line
               type="monotone"
               dataKey="dailySpending"
